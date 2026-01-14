@@ -1,10 +1,13 @@
-♻️ Agile Milestone Tracking Table (Core AI Milestones)
-Milestone No	Time Slot	Task (with AI Tech Stack)	Time Taken	Remarks
-1	9:30 – 10:00	Research accessibility & plan modules (AI, Accessibility)	30 min	Identified key disability challenges
-2	10:00 – 10:40	Feature planning & module design (Voice-to-Text, Dyslexia, ISL)	40 min	Finalized three core modules
-3	10:40 – 11:20	Initial implementation & setup (Whisper, NLP, MediaPipe, OpenCV)	40 min	Core AI logic implemented
-5	11:20 – 12:00	Backend integration & API setup (Whisper, ElevenLabs TTS)	40 min	Audio & transcript working
-6	12:00 – 12:30	Testing & bug fixes (Whisper, ElevenLabs, MediaPipe)	30 min	Modules tested & stable
+## ♻️ Agile Milestone Tracking Table (Core AI Milestones)
+
+| Milestone No | Time Slot      | Task (with AI Tech Stack)                                     | Time Taken | Remarks                           |
+|--------------|---------------|---------------------------------------------------------------|------------|----------------------------------|
+| 1            | 9:30 – 10:00  | Research accessibility & plan modules (AI, Accessibility)     | 30 min     | Identified key disability challenges |
+| 2            | 10:00 – 10:40 | Feature planning & module design (Voice-to-Text, Dyslexia, ISL) | 40 min     | Finalized three core modules      |
+| 3            | 10:40 – 11:20 | Initial implementation & setup (Whisper, NLP, MediaPipe, OpenCV) | 40 min     | Core AI logic implemented        |
+| 5            | 11:20 – 12:00 | Backend integration & API setup (Whisper, ElevenLabs TTS)    | 40 min     | Audio & transcript working        |
+| 6            | 12:00 – 12:30 | Testing & bug fixes (Whisper, ElevenLabs, MediaPipe)         | 30 min     | Modules tested & stable           |
+
 ♿ AI for Accessibility – Assistive Tools for Inclusive Education
 📌 Problem Statement
 
