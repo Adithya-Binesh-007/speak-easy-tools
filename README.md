@@ -1,4 +1,4 @@
-♻️ Agile Milestone Tracking Table (Core AI Milestones with Updated Times)
+♻️ Agile Milestone Tracking Table (Core AI Milestones)
 Milestone No	Time Slot	Task (with AI Tech Stack)	Time Taken	Remarks
 1	9:30 – 10:00	Research accessibility & plan modules (AI, Accessibility)	30 min	Identified key disability challenges
 2	10:00 – 10:40	Feature planning & module design (Voice-to-Text, Dyslexia, ISL)	40 min	Finalized three core modules
