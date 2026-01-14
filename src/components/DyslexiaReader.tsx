@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { ArrowLeft, Type, Sun, Minus, Plus, AlignLeft, AlignCenter } from "lucide-react";
+import { useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Type, Sun, Minus, Plus, AlignLeft, AlignCenter, Volume2, VolumeX, Loader2, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface DyslexiaReaderProps {
   onBack: () => void;
@@ -32,6 +33,111 @@ export function DyslexiaReader({ onBack }: DyslexiaReaderProps) {
   const [letterSpacing, setLetterSpacing] = useState(0.05);
   const [selectedBg, setSelectedBg] = useState(0);
   const [useDyslexicFont, setUseDyslexicFont] = useState(true);
+  
+  // TTS state
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { toast } = useToast();
+
+  const handleTextToSpeech = async () => {
+    if (!text.trim()) {
+      toast({
+        title: "No text to read",
+        description: "Please enter some text first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // If already playing, stop
+    if (isPlaying && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlaying(false);
+      setIsPaused(false);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-speech`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ text: text.trim() }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate speech");
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Create audio from base64
+      const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
+
+      audio.onerror = () => {
+        toast({
+          title: "Playback error",
+          description: "Could not play the audio.",
+          variant: "destructive",
+        });
+        setIsPlaying(false);
+      };
+
+      await audio.play();
+      setIsPlaying(true);
+    } catch (error) {
+      console.error("TTS error:", error);
+      toast({
+        title: "Text-to-speech failed",
+        description: error instanceof Error ? error.message : "Could not generate speech. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const togglePause = () => {
+    if (!audioRef.current) return;
+    
+    if (isPaused) {
+      audioRef.current.play();
+      setIsPaused(false);
+    } else {
+      audioRef.current.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const stopPlayback = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+    setIsPaused(false);
+  };
 
   return (
     <motion.div
@@ -77,6 +183,78 @@ export function DyslexiaReader({ onBack }: DyslexiaReaderProps) {
                 }}
                 placeholder="Paste or type your text here..."
               />
+            </div>
+
+            {/* Text-to-Speech Controls */}
+            <div className="mt-4 flex justify-center gap-3">
+              <AnimatePresence mode="wait">
+                {isLoading ? (
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                  >
+                    <Button variant="hero" size="lg" disabled className="gap-2">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Generating...
+                    </Button>
+                  </motion.div>
+                ) : isPlaying ? (
+                  <motion.div
+                    key="playing"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="flex gap-2"
+                  >
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={togglePause}
+                      className="gap-2"
+                    >
+                      {isPaused ? (
+                        <>
+                          <Play className="h-5 w-5" />
+                          Resume
+                        </>
+                      ) : (
+                        <>
+                          <Pause className="h-5 w-5" />
+                          Pause
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="lg"
+                      onClick={stopPlayback}
+                      className="gap-2"
+                    >
+                      <VolumeX className="h-5 w-5" />
+                      Stop
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="idle"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                  >
+                    <Button
+                      variant="hero"
+                      size="lg"
+                      onClick={handleTextToSpeech}
+                      className="gap-2"
+                    >
+                      <Volume2 className="h-5 w-5" />
+                      Read Aloud
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
