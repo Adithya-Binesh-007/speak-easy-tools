@@ -62,9 +62,7 @@ export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps
 
   const startCamera = async () => {
     try {
-      // Init model first (loads in parallel with camera prompt)
-      await initModel();
-
+      // getUserMedia MUST be called first to preserve user gesture context
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: 640, height: 480 },
       });
@@ -75,6 +73,9 @@ export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps
       }
       setIsCameraActive(true);
       setHasPermission(true);
+
+      // Init model after camera is running
+      await initModel();
     } catch (error) {
       console.error("Camera access denied:", error);
       setHasPermission(false);
