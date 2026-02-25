@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Camera, CameraOff, Info, Hand, Loader2 } from "lucide-react";
+import { ArrowLeft, Camera, CameraOff, Info, Hand, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHandLandmarker } from "@/hooks/useHandLandmarker";
-import { classifyGesture } from "@/lib/gestureClassifier";
+import { classifyGesture, type GestureResult } from "@/lib/gestureClassifier";
 import { HandLandmarkCanvas } from "@/components/HandLandmarkCanvas";
 import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
 
@@ -12,21 +12,29 @@ interface SignLanguageRecognitionProps {
 }
 
 const commonSigns = [
-  { sign: "Hello", description: "Wave your open hand (all fingers extended)" },
-  { sign: "Yes", description: "Thumbs up (thumb up, fingers closed)" },
-  { sign: "No", description: "Closed fist (all fingers closed)" },
-  { sign: "Peace", description: "Index + middle finger up, rest closed" },
-  { sign: "One", description: "Only index finger pointing up" },
-  { sign: "I Love You", description: "Thumb + pinky extended, rest closed" },
-  { sign: "Call Me", description: "Thumb + pinky extended like a phone" },
+  { sign: "Hello", emoji: "👋", description: "All fingers extended, open hand", category: "greeting" },
+  { sign: "Thumbs Up", emoji: "👍", description: "Thumb up, fingers closed", category: "response" },
+  { sign: "Thumbs Down", emoji: "👎", description: "Thumb down, fingers closed", category: "response" },
+  { sign: "Fist", emoji: "✊", description: "All fingers closed into a fist", category: "response" },
+  { sign: "OK", emoji: "👌", description: "Thumb + index tips touching, others up", category: "response" },
+  { sign: "Peace", emoji: "✌️", description: "Index + middle up, rest closed", category: "expression" },
+  { sign: "I Love You", emoji: "🤟", description: "Thumb + index + pinky extended", category: "expression" },
+  { sign: "Rock On", emoji: "🤘", description: "Index + pinky up, no thumb", category: "expression" },
+  { sign: "Call Me", emoji: "🤙", description: "Thumb + pinky extended like a phone", category: "expression" },
+  { sign: "Finger Gun", emoji: "👉", description: "Thumb + index extended, rest closed", category: "expression" },
+  { sign: "One", emoji: "☝️", description: "Only index finger up", category: "number" },
+  { sign: "Two", emoji: "2️⃣", description: "Index + middle up + thumb", category: "number" },
+  { sign: "Three", emoji: "3️⃣", description: "Index + middle + ring up", category: "number" },
+  { sign: "Four", emoji: "4️⃣", description: "All fingers up, thumb closed", category: "number" },
 ];
 
 export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps) {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [detectedSign, setDetectedSign] = useState<string | null>(null);
+  const [detectedSign, setDetectedSign] = useState<GestureResult | null>(null);
   const [currentLandmarks, setCurrentLandmarks] = useState<NormalizedLandmark[][]>([]);
-  const [detectionLog, setDetectionLog] = useState<string[]>([]);
+  const [detectionLog, setDetectionLog] = useState<{ gesture: GestureResult; time: string }[]>([]);
+  const lastDetectedRef = useRef<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number>(0);
@@ -45,12 +53,17 @@ export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps
       const gesture = classifyGesture(result.landmarks[0]);
       if (gesture) {
         setDetectedSign(gesture);
-        setDetectionLog((prev) => {
-          const updated = [`${gesture} — ${new Date().toLocaleTimeString()}`, ...prev];
-          return updated.slice(0, 10); // keep last 10
-        });
+        // Only log if different from last detection to avoid spam
+        if (gesture.name !== lastDetectedRef.current) {
+          lastDetectedRef.current = gesture.name;
+          setDetectionLog((prev) => {
+            const updated = [{ gesture, time: new Date().toLocaleTimeString() }, ...prev];
+            return updated.slice(0, 20);
+          });
+        }
       } else {
         setDetectedSign(null);
+        lastDetectedRef.current = null;
       }
     } else {
       setCurrentLandmarks([]);
@@ -153,13 +166,13 @@ export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps
                   {/* Detection overlay */}
                   <AnimatePresence>
                     {detectedSign && (
-                      <motion.div
+                       <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
                         className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-xl bg-success px-6 py-3 text-success-foreground shadow-medium"
                       >
-                        <p className="text-lg font-semibold">Detected: {detectedSign}</p>
+                        <p className="text-lg font-semibold">{detectedSign.emoji} {detectedSign.name}</p>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -229,17 +242,39 @@ export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps
           <div className="space-y-6">
             {/* Detection Log */}
             <div className="rounded-2xl border-2 border-border bg-card p-6 shadow-soft">
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
-                <Hand className="h-5 w-5 text-primary" />
-                Recognition Log
-              </h2>
-              <div className="min-h-[120px] max-h-[200px] overflow-y-auto rounded-xl bg-muted p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                  <Hand className="h-5 w-5 text-primary" />
+                  Recognition Log
+                  {detectionLog.length > 0 && (
+                    <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      {detectionLog.length}
+                    </span>
+                  )}
+                </h2>
+                {detectionLog.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => setDetectionLog([])} className="h-7 gap-1 text-xs text-muted-foreground">
+                    <Trash2 className="h-3 w-3" /> Clear
+                  </Button>
+                )}
+              </div>
+              <div className="min-h-[120px] max-h-[280px] overflow-y-auto rounded-xl bg-muted p-3">
                 {detectionLog.length > 0 ? (
-                  <ul className="space-y-1 text-sm">
+                  <ul className="space-y-2">
                     {detectionLog.map((entry, i) => (
-                      <li key={i} className="text-foreground">
-                        {entry}
-                      </li>
+                      <motion.li
+                        key={`${entry.gesture.name}-${entry.time}-${i}`}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center gap-3 rounded-lg bg-card p-2.5 shadow-sm"
+                      >
+                        <span className="text-xl">{entry.gesture.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">{entry.gesture.name}</p>
+                          <p className="text-xs text-muted-foreground">{entry.gesture.category}</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{entry.time}</span>
+                      </motion.li>
                     ))}
                   </ul>
                 ) : (
@@ -257,15 +292,21 @@ export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps
               <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
                 <Info className="h-5 w-5 text-primary" />
                 Supported Gestures
+                <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  {commonSigns.length}
+                </span>
               </h2>
-              <div className="space-y-3">
+              <div className="max-h-[400px] overflow-y-auto space-y-2">
                 {commonSigns.map((item) => (
                   <div
                     key={item.sign}
-                    className="rounded-lg bg-secondary/50 p-3"
+                    className="flex items-center gap-3 rounded-lg bg-secondary/50 p-2.5"
                   >
-                    <p className="font-medium text-foreground">{item.sign}</p>
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                    <span className="text-xl">{item.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{item.sign}</p>
+                      <p className="text-xs text-muted-foreground">{item.description}</p>
+                    </div>
                   </div>
                 ))}
               </div>
