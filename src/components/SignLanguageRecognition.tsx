@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Camera, CameraOff, Info, Hand, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, CameraOff, Info, Hand, Loader2, Trash2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHandLandmarker } from "@/hooks/useHandLandmarker";
 import { classifyGesture, type GestureResult } from "@/lib/gestureClassifier";
 import { HandLandmarkCanvas } from "@/components/HandLandmarkCanvas";
+import { SignLanguageLibrary } from "@/components/SignLanguageLibrary";
 import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
+
+type SignTab = "camera" | "library";
 
 interface SignLanguageRecognitionProps {
   onBack: () => void;
@@ -29,6 +32,7 @@ const commonSigns = [
 ];
 
 export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps) {
+  const [activeTab, setActiveTab] = useState<SignTab>("camera");
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [detectedSign, setDetectedSign] = useState<GestureResult | null>(null);
@@ -139,11 +143,38 @@ export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Sign Language Recognition</h1>
-            <p className="text-muted-foreground">Real-time hand detection powered by MediaPipe</p>
+            <h1 className="text-2xl font-bold text-foreground">Sign Language</h1>
+            <p className="text-muted-foreground">Recognition & Library</p>
           </div>
         </div>
 
+        {/* Tab Switcher */}
+        <div className="mb-6 flex gap-2 rounded-xl bg-muted p-1">
+          <button
+            onClick={() => setActiveTab("camera")}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === "camera"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Camera className="h-4 w-4" />
+            Live Recognition
+          </button>
+          <button
+            onClick={() => setActiveTab("library")}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === "library"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+            Sign Library
+          </button>
+        </div>
+
+        {activeTab === "camera" ? (
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Camera View */}
           <div className="lg:col-span-2">
@@ -313,6 +344,9 @@ export function SignLanguageRecognition({ onBack }: SignLanguageRecognitionProps
             </div>
           </div>
         </div>
+        ) : (
+          <SignLanguageLibrary />
+        )}
       </div>
     </motion.div>
   );
