@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Copy, Download, ArrowLeft, Check, Search } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  Mic,
+  MicOff,
+  Copy,
+  Download,
+  ArrowLeft,
+  Check,
+  Search,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -17,14 +25,20 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
 
   const recognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef("");
+  const lastFinalRef = useRef("");
 
   useEffect(() => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+    if (
+      !("webkitSpeechRecognition" in window) &&
+      !("SpeechRecognition" in window)
+    ) {
       setIsSupported(false);
     }
   }, []);
 
   const startRecording = () => {
+    if (isRecording) return;
+
     const SpeechRecognition =
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
@@ -45,10 +59,16 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
+        const transcriptPiece = result[0].transcript.trim();
+
         if (result.isFinal) {
-          final += result[0].transcript + " ";
+          // 🔥 Android duplicate prevention
+          if (transcriptPiece !== lastFinalRef.current) {
+            final += transcriptPiece + " ";
+            lastFinalRef.current = transcriptPiece;
+          }
         } else {
-          interim += result[0].transcript;
+          interim += transcriptPiece;
         }
       }
 
@@ -65,7 +85,6 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
     };
 
     recognition.onend = () => {
-      // DO NOT auto restart (mobile duplication fix)
       setIsRecording(false);
     };
 
@@ -94,7 +113,9 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `transcript-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `transcript-${new Date()
+      .toISOString()
+      .slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -109,6 +130,7 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
     setTranscript("");
     setInterimTranscript("");
     finalTranscriptRef.current = "";
+    lastFinalRef.current = "";
   };
 
   return (
@@ -119,12 +141,15 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
       className="min-h-screen bg-background px-4 py-8"
     >
       <div className="mx-auto max-w-3xl">
+        {/* Header */}
         <div className="mb-8 flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Voice to Text</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              Voice to Text
+            </h1>
             <p className="text-muted-foreground">
               Perfect for exams and note-taking
             </p>
@@ -133,10 +158,11 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
 
         {!isSupported ? (
           <p className="text-destructive text-center">
-            Speech recognition not supported.
+            Speech recognition not supported in this browser.
           </p>
         ) : (
           <>
+            {/* Recording Button */}
             <div className="mb-8 flex flex-col items-center gap-6">
               <Button
                 variant="record"
@@ -155,37 +181,56 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
               </Button>
 
               <p className="text-muted-foreground">
-                {isRecording ? "Listening..." : "Tap to start"}
+                {isRecording
+                  ? "Listening... Tap to stop"
+                  : "Tap the microphone to start"}
               </p>
             </div>
 
-            <div className="min-h-[300px] rounded-2xl border-2 border-border bg-card p-6">
+            {/* Transcript Box */}
+            <div className="min-h-[300px] rounded-2xl border-2 border-border bg-card p-6 shadow-soft">
               {transcript || interimTranscript ? (
-                <div className="whitespace-pre-wrap text-lg">
+                <div className="whitespace-pre-wrap text-lg leading-relaxed text-foreground">
                   {transcript}
                   <span className="text-muted-foreground">
                     {interimTranscript}
                   </span>
                 </div>
               ) : (
-                <p className="text-muted-foreground text-center">
+                <p className="text-center text-muted-foreground">
                   Your transcription will appear here...
                 </p>
               )}
 
               {transcript && (
-                <div className="mt-6 flex flex-wrap gap-3 justify-end">
-                  <Button variant="outline" size="sm" onClick={copyToClipboard}>
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                <div className="mt-6 flex flex-wrap justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyToClipboard}
+                  >
+                    {copied ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
                     {copied ? "Copied!" : "Copy"}
                   </Button>
 
-                  <Button variant="outline" size="sm" onClick={downloadTranscript}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadTranscript}
+                  >
                     <Download className="h-4 w-4" />
                     Download
                   </Button>
 
-                  <Button variant="outline" size="sm" onClick={searchTranscript}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={searchTranscript}
+                  >
                     <Search className="h-4 w-4" />
                     Search
                   </Button>
