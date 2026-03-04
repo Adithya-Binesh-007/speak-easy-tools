@@ -16,14 +16,20 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
   const [isSupported, setIsSupported] = useState(true);
 
   useEffect(() => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+    if (
+      !("webkitSpeechRecognition" in window) &&
+      !("SpeechRecognition" in window)
+    ) {
       setIsSupported(false);
     }
   }, []);
 
+  // ✅ FIXED startRecording (No infinite restart issue)
   const startRecording = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
     if (!SpeechRecognition) {
       setIsSupported(false);
       return;
@@ -50,25 +56,22 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
       if (final) {
         setTranscript((prev) => prev + final);
       }
+
       setInterimTranscript(interim);
     };
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
+    recognition.onerror = () => {
       setIsRecording(false);
     };
 
     recognition.onend = () => {
-      if (isRecording) {
-        recognition.start();
-      }
+      setIsRecording(false);
     };
 
     recognition.start();
-    setIsRecording(true);
-
     (window as any).currentRecognition = recognition;
-  }, [isRecording]);
+    setIsRecording(true);
+  }, []);
 
   const stopRecording = useCallback(() => {
     if ((window as any).currentRecognition) {
@@ -90,9 +93,20 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `transcript-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `transcript-${new Date()
+      .toISOString()
+      .slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // ✅ NEW: Google Search Feature
+  const searchAnswer = () => {
+    if (!transcript.trim()) return;
+
+    const query = encodeURIComponent(transcript);
+    const googleUrl = `https://www.google.com/search?q=${query}`;
+    window.open(googleUrl, "_blank");
   };
 
   return (
@@ -109,15 +123,20 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Voice to Text</h1>
-            <p className="text-muted-foreground">Perfect for exams and note-taking</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              Voice to Text
+            </h1>
+            <p className="text-muted-foreground">
+              Perfect for exams and note-taking
+            </p>
           </div>
         </div>
 
         {!isSupported ? (
           <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/10 p-8 text-center">
             <p className="text-destructive">
-              Speech recognition is not supported in your browser. Please try Chrome, Edge, or Safari.
+              Speech recognition is not supported in your browser.
+              Please try Chrome, Edge, or Safari.
             </p>
           </div>
         ) : (
@@ -128,7 +147,9 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
                 <Button
                   variant="record"
                   size="iconLg"
-                  onClick={isRecording ? stopRecording : startRecording}
+                  onClick={
+                    isRecording ? stopRecording : startRecording
+                  }
                   className={cn(
                     "h-24 w-24 transition-all",
                     isRecording && "animate-pulse-record"
@@ -141,7 +162,6 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
                   )}
                 </Button>
 
-                {/* Audio visualization */}
                 <AnimatePresence>
                   {isRecording && (
                     <motion.div
@@ -180,7 +200,9 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
               {transcript || interimTranscript ? (
                 <div className="whitespace-pre-wrap text-lg leading-relaxed text-foreground">
                   {transcript}
-                  <span className="text-muted-foreground">{interimTranscript}</span>
+                  <span className="text-muted-foreground">
+                    {interimTranscript}
+                  </span>
                 </div>
               ) : (
                 <p className="text-center text-muted-foreground">
@@ -195,7 +217,11 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
                   animate={{ opacity: 1, y: 0 }}
                   className="mt-6 flex justify-end gap-3"
                 >
-                  <Button variant="outline" size="sm" onClick={copyToClipboard}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyToClipboard}
+                  >
                     {copied ? (
                       <Check className="h-4 w-4" />
                     ) : (
@@ -203,10 +229,25 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
                     )}
                     {copied ? "Copied!" : "Copy"}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={downloadTranscript}>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadTranscript}
+                  >
                     <Download className="h-4 w-4" />
                     Download
                   </Button>
+
+                  {/* ✅ NEW Search Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={searchAnswer}
+                  >
+                    🔍 Search
+                  </Button>
+
                   <Button
                     variant="ghost"
                     size="sm"
@@ -223,11 +264,13 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
 
             {/* Tips */}
             <div className="mt-8 rounded-2xl bg-secondary/50 p-6">
-              <h3 className="mb-3 font-semibold text-foreground">Tips for best results:</h3>
+              <h3 className="mb-3 font-semibold text-foreground">
+                Tips for best results:
+              </h3>
               <ul className="space-y-2 text-muted-foreground">
                 <li>• Speak clearly and at a moderate pace</li>
                 <li>• Use a quiet environment when possible</li>
-                <li>• Say punctuation like "period" or "comma" for formatting</li>
+                <li>• Say punctuation like "period" or "comma"</li>
                 <li>• The transcript auto-saves as you speak</li>
               </ul>
             </div>
