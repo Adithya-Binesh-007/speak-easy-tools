@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Copy, Download, ArrowLeft, Check } from "lucide-react";
+import { Mic, MicOff, Copy, Download, ArrowLeft, Check, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -15,17 +15,16 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
   const [copied, setCopied] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
 
+  const recognitionRef = useRef<any>(null);
+  const finalTranscriptRef = useRef("");
+
   useEffect(() => {
-    if (
-      !("webkitSpeechRecognition" in window) &&
-      !("SpeechRecognition" in window)
-    ) {
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
       setIsSupported(false);
     }
   }, []);
 
-  // ✅ FIXED startRecording (No infinite restart issue)
-  const startRecording = useCallback(() => {
+  const startRecording = () => {
     const SpeechRecognition =
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
@@ -54,7 +53,8 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
       }
 
       if (final) {
-        setTranscript((prev) => prev + final);
+        finalTranscriptRef.current += final;
+        setTranscript(finalTranscriptRef.current);
       }
 
       setInterimTranscript(interim);
@@ -65,22 +65,23 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
     };
 
     recognition.onend = () => {
+      // DO NOT auto restart (mobile duplication fix)
       setIsRecording(false);
     };
 
     recognition.start();
-    (window as any).currentRecognition = recognition;
+    recognitionRef.current = recognition;
     setIsRecording(true);
-  }, []);
+  };
 
-  const stopRecording = useCallback(() => {
-    if ((window as any).currentRecognition) {
-      (window as any).currentRecognition.stop();
-      (window as any).currentRecognition = null;
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
     }
     setIsRecording(false);
     setInterimTranscript("");
-  }, []);
+  };
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(transcript);
@@ -93,20 +94,21 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `transcript-${new Date()
-      .toISOString()
-      .slice(0, 10)}.txt`;
+    a.download = `transcript-${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // ✅ NEW: Google Search Feature
-  const searchAnswer = () => {
+  const searchTranscript = () => {
     if (!transcript.trim()) return;
-
     const query = encodeURIComponent(transcript);
-    const googleUrl = `https://www.google.com/search?q=${query}`;
-    window.open(googleUrl, "_blank");
+    window.open(`https://www.google.com/search?q=${query}`, "_blank");
+  };
+
+  const clearTranscript = () => {
+    setTranscript("");
+    setInterimTranscript("");
+    finalTranscriptRef.current = "";
   };
 
   return (
@@ -117,15 +119,12 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
       className="min-h-screen bg-background px-4 py-8"
     >
       <div className="mx-auto max-w-3xl">
-        {/* Header */}
         <div className="mb-8 flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Voice to Text
-            </h1>
+            <h1 className="text-2xl font-bold text-foreground">Voice to Text</h1>
             <p className="text-muted-foreground">
               Perfect for exams and note-taking
             </p>
@@ -133,146 +132,69 @@ export function VoiceToText({ onBack }: VoiceToTextProps) {
         </div>
 
         {!isSupported ? (
-          <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/10 p-8 text-center">
-            <p className="text-destructive">
-              Speech recognition is not supported in your browser.
-              Please try Chrome, Edge, or Safari.
-            </p>
-          </div>
+          <p className="text-destructive text-center">
+            Speech recognition not supported.
+          </p>
         ) : (
           <>
-            {/* Recording Control */}
             <div className="mb-8 flex flex-col items-center gap-6">
-              <div className="relative">
-                <Button
-                  variant="record"
-                  size="iconLg"
-                  onClick={
-                    isRecording ? stopRecording : startRecording
-                  }
-                  className={cn(
-                    "h-24 w-24 transition-all",
-                    isRecording && "animate-pulse-record"
-                  )}
-                >
-                  {isRecording ? (
-                    <MicOff className="h-10 w-10" />
-                  ) : (
-                    <Mic className="h-10 w-10" />
-                  )}
-                </Button>
+              <Button
+                variant="record"
+                size="iconLg"
+                onClick={isRecording ? stopRecording : startRecording}
+                className={cn(
+                  "h-24 w-24",
+                  isRecording && "animate-pulse-record"
+                )}
+              >
+                {isRecording ? (
+                  <MicOff className="h-10 w-10" />
+                ) : (
+                  <Mic className="h-10 w-10" />
+                )}
+              </Button>
 
-                <AnimatePresence>
-                  {isRecording && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className="absolute -bottom-8 left-1/2 flex -translate-x-1/2 gap-1"
-                    >
-                      {[...Array(5)].map((_, i) => (
-                        <div
-                          key={i}
-                          className={cn(
-                            "h-6 w-1.5 rounded-full bg-primary",
-                            i === 0 && "animate-wave",
-                            i === 1 && "animate-wave-delay-1",
-                            i === 2 && "animate-wave-delay-2",
-                            i === 3 && "animate-wave-delay-3",
-                            i === 4 && "animate-wave-delay-4"
-                          )}
-                        />
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              <p className="text-center text-muted-foreground">
-                {isRecording
-                  ? "Listening... Click to stop"
-                  : "Click the microphone to start recording"}
+              <p className="text-muted-foreground">
+                {isRecording ? "Listening..." : "Tap to start"}
               </p>
             </div>
 
-            {/* Transcript Area */}
-            <div className="relative min-h-[300px] rounded-2xl border-2 border-border bg-card p-6 shadow-soft">
+            <div className="min-h-[300px] rounded-2xl border-2 border-border bg-card p-6">
               {transcript || interimTranscript ? (
-                <div className="whitespace-pre-wrap text-lg leading-relaxed text-foreground">
+                <div className="whitespace-pre-wrap text-lg">
                   {transcript}
                   <span className="text-muted-foreground">
                     {interimTranscript}
                   </span>
                 </div>
               ) : (
-                <p className="text-center text-muted-foreground">
+                <p className="text-muted-foreground text-center">
                   Your transcription will appear here...
                 </p>
               )}
 
-              {/* Action buttons */}
               {transcript && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-6 flex justify-end gap-3"
-                >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={copyToClipboard}
-                  >
-                    {copied ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
+                <div className="mt-6 flex flex-wrap gap-3 justify-end">
+                  <Button variant="outline" size="sm" onClick={copyToClipboard}>
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     {copied ? "Copied!" : "Copy"}
                   </Button>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={downloadTranscript}
-                  >
+                  <Button variant="outline" size="sm" onClick={downloadTranscript}>
                     <Download className="h-4 w-4" />
                     Download
                   </Button>
 
-                  {/* ✅ NEW Search Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={searchAnswer}
-                  >
-                    🔍 Search
+                  <Button variant="outline" size="sm" onClick={searchTranscript}>
+                    <Search className="h-4 w-4" />
+                    Search
                   </Button>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setTranscript("");
-                      setInterimTranscript("");
-                    }}
-                  >
+                  <Button variant="ghost" size="sm" onClick={clearTranscript}>
                     Clear
                   </Button>
-                </motion.div>
+                </div>
               )}
-            </div>
-
-            {/* Tips */}
-            <div className="mt-8 rounded-2xl bg-secondary/50 p-6">
-              <h3 className="mb-3 font-semibold text-foreground">
-                Tips for best results:
-              </h3>
-              <ul className="space-y-2 text-muted-foreground">
-                <li>• Speak clearly and at a moderate pace</li>
-                <li>• Use a quiet environment when possible</li>
-                <li>• Say punctuation like "period" or "comma"</li>
-                <li>• The transcript auto-saves as you speak</li>
-              </ul>
             </div>
           </>
         )}
